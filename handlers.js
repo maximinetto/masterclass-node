@@ -37,19 +37,27 @@ handlers._users.post = function (data, callback) {
       : false;
   const password =
     typeof data.payload.password === "string" &&
-    data.payload.password.trim().length === 10
+    data.payload.password.trim().length >= 8
       ? data.payload.password.trim()
       : false;
 
-  if (!(name && email && streetAddress)) {
+  if (!(name && email && streetAddress && password)) {
     return callback(400, { Error: "Missing required fields" });
   }
 
   _data
     .read("users", email)
-    .then(() => {
-      const hashedPassword = helpers.hash(password);
-      if (hashedPassword) {
+    .then(
+      () => {
+        callback(400, {
+          Error: "A user with that email number already exists",
+        });
+      },
+      (err) => {
+        const hashedPassword = helpers.hash(password);
+        if (!hashedPassword) {
+          return callback(500, { Error: "Could not hash the user's password" });
+        }
         const userObject = {
           name,
           email,
@@ -57,32 +65,26 @@ handlers._users.post = function (data, callback) {
           hashedPassword,
         };
 
-        _data
-          .create("users", email, userObject)
-          .then(() => {
-            callback(200);
-          })
-          .catch((err) => {
-            console.log(err);
-            callback(500, { Error: "Could not create the new user" });
-          });
-      } else {
-        callback(500, { Error: "Could not hash the user's password" });
+        return _data.create("users", email, userObject);
       }
-    })
-    .catch((err) => {
-      callback(400, {
-        Error: "A user with that email number already exists",
-      });
-    });
+    )
+    .then(
+      () => {
+        callback(200);
+      },
+      (err) => {
+        console.log(err);
+        callback(500, { Error: "Could not create the new user" });
+      }
+    );
 };
 
 handlers._users.get = function (data, callback) {
   const email =
-    typeof data.payload.email === "string" &&
-    data.payload.email.trim().length > 0 &&
-    data.payload.email.match(EMAIL_REGEX) !== null
-      ? data.payload.email.trim()
+    typeof data.queryStringObject.email === "string" &&
+    data.queryStringObject.email.trim().length > 0 &&
+    data.queryStringObject.email.match(EMAIL_REGEX) !== null
+      ? data.queryStringObject.email.trim()
       : false;
 
   if (email) {
@@ -132,7 +134,7 @@ handlers._users.put = function (data, callback) {
       : false;
   const password =
     typeof data.payload.password === "string" &&
-    data.payload.password.trim().length === 10
+    data.payload.password.trim().length >= 8
       ? data.payload.password.trim()
       : false;
 
@@ -193,10 +195,10 @@ handlers._users.put = function (data, callback) {
 
 handlers._users.delete = function (data, callback) {
   const email =
-    typeof data.payload.email === "string" &&
-    data.payload.email.trim().length > 0 &&
-    data.payload.email.match(EMAIL_REGEX) !== null
-      ? data.payload.email.trim()
+    typeof data.queryStringObject.email === "string" &&
+    data.queryStringObject.email.trim().length > 0 &&
+    data.queryStringObject.email.match(EMAIL_REGEX) !== null
+      ? data.queryStringObject.email.trim()
       : false;
 
   if (!email) {
@@ -260,7 +262,7 @@ handlers._tokens.post = function (data, callback) {
       : false;
   const password =
     typeof data.payload.password === "string" &&
-    data.payload.password.trim().length > 0
+    data.payload.password.trim().length >= 8
       ? data.payload.password.trim()
       : false;
 
